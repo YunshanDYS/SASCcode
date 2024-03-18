@@ -1,7 +1,7 @@
 SASC code
 ================
 
-This GitHub repository contains code to reproduce simulation results, figures, and real data analysis results from the paper "Immune profiling among colorectal cancer subtypes using dependent mixture models" by Yunshan Duan, Shuai Guo, Wenyi Wang and Peter Mueller. Our paper can be found online [here](https://www.biorxiv.org/content/10.1101/2023.07.24.550400v2.abstract).
+This GitHub repository contains code to reproduce simulation results, figures, and real data analysis results from the paper "Immune profiling among colorectal cancer subtypes using dependent mixture models".
 
 ## File directories
 
