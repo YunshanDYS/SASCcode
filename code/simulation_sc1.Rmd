@@ -2,7 +2,9 @@
 title: "Simulation sceanrio 1"
 author: "Yunshan Duan"
 date: '2024-03-14'
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
