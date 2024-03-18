@@ -4,3 +4,13 @@
 .RData
 .Ruserdata
 *.Rproj
+data/realdata/1_CRC_final_annotation.rds
+data/simulation_sc1/pbmc3k_final.rds
+data/simulation_sc1/pbmc_tutorial.rds
+data/simulation_sc2/pbmc3k_final.rds
+data/simulation_sc2/pbmc_copula.rds
+data/simulation_sc1/sim_data.rds
+data/simulation_sc3/pbmc3k_final.rds
+data/simulation_sc3/pbmc_copula.rds
+data/simulation_sc3/pbmc_tutorial.rds
+output/realdata/data/output888.rds
