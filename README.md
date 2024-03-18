@@ -21,15 +21,15 @@ SASC_CRC.Rmd reproduces real data analysis results. (Figure 1, 5, S7, and S8). S
 
 #### Simulation studies
 
-simulation_sc1.Rmd reproduces simulation study scenario 1 results. (Figure 2, 3, 4 and Table 2)
+simulation_sc1.Rmd reproduces simulation study scenario 1 results (Figure 2, 3, 4 and Table 2). See [here](code/simulation_sc1.pdf) for a pdf output of the .Rmd file as a tutorial.
 
-Similarly, see simulation_sc2.Rmd, simulation_sc3.Rmd for scenario 2 and 3. (Figures in Appendix D)
+Similarly, see simulation_sc2.Rmd, simulation_sc3.Rmd for scenario 2 and 3 (Figures in Appendix D).
 
 ### data folder
 
 The data folder contains real data and data generated in simulation studies.
 
-simulate_data_sc1.Rmd reproduces the data generation process in simulation study scenario 1. Codes are also provided for scenario 2 and 3 in simulate_data_sc2.Rmd and simulate_data_sc3.Rmd.
+simulate_data_sc1.Rmd reproduces the data generation process in simulation study scenario 1. See [here](data/simulate_data_sc1.pdf) for a pdf output of the .Rmd file as a tutorial. Codes are also provided for scenario 2 and 3 in simulate_data_sc2.Rmd and simulate_data_sc3.Rmd.
 
 ### output folder
 
