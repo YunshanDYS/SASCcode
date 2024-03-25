@@ -280,14 +280,14 @@ weights_mat <- weights_mat_new
 
 ``` {r}
 output <- input
-output@meta.data$Cluster888 <- cluster
+output@meta.data$SASC_cluster <- cluster
 
 clusterinfo <- list(cluster_type_CLE = cluster_type_CLE,
                     xi_est = xi_est,
                     prob_in_h_mat = prob_in_h_mat,
                     weights = weights,
                     weights_mat = weights_mat)
-saveRDS(output, file = paste0(output_data_dir, "/output888.rds"))
+saveRDS(output, file = paste0(output_data_dir, "/SASC_output.rds"))
 saveRDS(clusterinfo, file = paste0(output_data_dir, "/clusterinfo.rds"))
 ```
 
@@ -309,7 +309,7 @@ weights <- clusterinfo$weights
 weights_mat <- clusterinfo$weights_mat
 cluster_type_CLE <- clusterinfo$cluster_type_CLE
 prob_in_h_mat <- clusterinfo$prob_in_h_mat
-cluster <- output@meta.data$Cluster888
+cluster <- output@meta.data$SASC_cluster
 annotation <- output@meta.data$annotation_final
 gene <- output@reductions$pca@cell.embeddings
 gene_umap <- output@reductions$umap@cell.embeddings

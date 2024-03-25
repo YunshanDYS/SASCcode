@@ -1,0 +1,144 @@
+---
+title: "DE analysis"
+author: "Shuai Guo, Yunshan Duan"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r message=FALSE}
+# load the pacakges
+  library(glmpca)
+  library(ggplot2); theme_set(theme_bw())
+  library(cluster)
+  library(salso)
+  library(ggpubr)
+  library(dplyr)
+  library(fdrtool)
+  library(Seurat)
+# read the model output
+  output = readRDS(file = "../output/realdata/data/SASC_output.rds")
+  clusterinfo = readRDS(file = "../output/realdata/data/clusterinfo.rds")
+```
+
+```{r fig.width=12, fig.height=5}
+# print the clustering results
+  output$SASC_cluster = factor(output$SASC_cluster, c(1,6,2:5,7,8,10,9,11))
+  table(output$SASC_cluster, output$annotation_final)
+```
+
+```{r fig.width=12, fig.height=5}
+# Assign annotation results  
+  SASC_annotation = rep("Common_clus", dim(output)[2])
+  SASC_annotation[which(output$SASC_cluster == 4 | output$SASC_cluster == 5 | output$SASC_cluster == 9)] = "LO_enrich"
+  SASC_annotation[which(output$SASC_cluster == 6 | output$SASC_cluster == 10| output$SASC_cluster ==11)] = "EO_enrich"
+  output$SASC_annotation = factor(SASC_annotation, levels = c("Common_clus", "LO_enrich", "EO_enrich"))
+# Visualize the results  
+  DimPlot(output, group.by = "SASC_annotation")+
+    DimPlot(output, group.by = "Onset")
+```
+
+```{r}
+  Idents(output) = output$T_cell_type
+  CD4 = subset(output, idents = "CD4")
+  CD8 = subset(output, idents = "CD8")
+```
+
+# The CD4 T helper cells
+
+```{r fig.width=6, fig.height=2.5}
+# Identify conditional specific genes for CD4 subtypes
+  Idents(CD4) = CD4$annotation_final
+  CD4_help = subset(CD4, idents = "cd4T_hp")
+  Idents(CD4_help) = CD4_help$SASC_annotation
+  output.markers <- FindAllMarkers(CD4_help, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+  top2 = output.markers %>%
+      group_by(cluster) %>%
+      slice_max(n = 5, order_by = avg_log2FC)
+  top2
+```
+
+```{r fig.width=6, fig.height=2.5}
+# Print our the final DE genes that we are interested in.
+  final_list=c("PMAIP1","CD83","LMNA","NR4A1","CCR7","SESN1","TCF7","BTLA","HLA-DRB1","HLA-DRB5","HLA-DRB6","CCL4","CCL5")
+  p =
+  DotPlot(CD4_help, features = unique(final_list), dot.scale=5, cols="RdBu") +
+        theme(title=element_text(size=10), axis.text.x=element_text(size=10, angle=45, hjust=1),
+              axis.title.x=element_text(size=0), axis.text.y=element_text(size=10),
+              axis.title.y=element_text(size=10, face="bold"), legend.position = "right",
+              legend.text=element_text(size=10), legend.title=element_text(size=10))
+  p
+```
+
+# The CD4 Treg cells
+
+```{r fig.width=6, fig.height=2.5}
+# Subset the Tregs
+  CD4_reg = subset(CD4, idents = "cd4T_rg")
+  Idents(CD4_reg) = CD4_reg$SASC_annotation
+  output.markers <- FindAllMarkers(CD4_reg, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+  top2 = output.markers %>%
+      group_by(cluster) %>%
+      slice_max(n = 4, order_by = avg_log2FC)
+  top2
+```
+
+```{r fig.width=6, fig.height=2.5}
+# Print our the final DE genes that we are interested in.
+  final_list=c("GNLY","JMY","STMN1","SAE1","MGAT4A","VCPIP1","DDX10","IL2RB","TNFRSF4","TNFRSF18","TBC1D4","SEL1L3")
+  p =
+  DotPlot(CD4_reg, features = final_list, dot.scale=5, cols="RdBu") +
+        theme(title=element_text(size=10), axis.text.x=element_text(size=10, angle=45, hjust=1),
+              axis.title.x=element_text(size=0), axis.text.y=element_text(size=10),
+              axis.title.y=element_text(size=10, face="bold"), legend.position = "right",
+              legend.text=element_text(size=10), legend.title=element_text(size=10))
+  p
+```
+
+# The CD8 T effector memory cells
+
+```{r fig.width=6, fig.height=2.5}
+# subset cell type
+  Idents(CD8) = CD8$annotation_final
+  CD8_em = subset(CD8, idents = "CD8T_em")
+  Idents(CD8_em) = CD8_em$SASC_annotation
+  output.markers <- FindAllMarkers(CD8_em, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+  top2 = output.markers %>%
+      group_by(cluster) %>%
+      slice_max(n = 5, order_by = avg_log2FC)
+  top2
+```
+
+```{r fig.width=6, fig.height=2.5}
+# Print our the final DE genes that we are interested in.
+  p =
+  DotPlot(CD8_em, features = unique(top2$gene), dot.scale=5, cols="RdBu") +
+        theme(title=element_text(size=10), axis.text.x=element_text(size=10, angle=45, hjust=1),
+              axis.title.x=element_text(size=0), axis.text.y=element_text(size=10),
+              axis.title.y=element_text(size=10, face="bold"), legend.position = "right",
+              legend.text=element_text(size=10), legend.title=element_text(size=10))
+  p
+```
+
+# The CD8 T exhausted cells
+
+```{r fig.width=6, fig.height=2.5}
+# subset cell type
+  CD8_ex = subset(CD8, idents = "CD8T_ex")
+  Idents(CD8_ex) = CD8_ex$SASC_annotation
+  output.markers <- FindAllMarkers(CD8_ex, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+  top2 = output.markers %>%
+      group_by(cluster) %>%
+      slice_max(n = 5, order_by = avg_log2FC)
+  top2
+```
+
+```{r fig.width=6, fig.height=2.5}
+  p =
+  DotPlot(CD8_ex, features = unique(top2$gene), dot.scale=5, cols="RdBu") +
+        theme(title=element_text(size=10), axis.text.x=element_text(size=10, angle=45, hjust=1),
+              axis.title.x=element_text(size=0), axis.text.y=element_text(size=10),
+              axis.title.y=element_text(size=10, face="bold"), legend.position = "right",
+              legend.text=element_text(size=10), legend.title=element_text(size=10))
+  p
+```

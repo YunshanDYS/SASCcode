@@ -1,0 +1,285 @@
+---
+title: "Real data application - ZINB-WaVE"
+author: "Shuai Guo and Yunshan Duan"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Prepare the env for ZINB-WaVE analysis
+
+```{r warning=FALSE, message=FALSE}
+# the packages for ZINB-WAVE analysis
+  library(ggplot2)
+  library(dplyr)
+  library(Seurat)
+  library("zinbwave")
+  library("SummarizedExperiment")
+
+# load required function
+  source("SASC_func.R")
+  source("realdata_func.R")
+  source("comparison_func.R")
+
+  data_dir <- "../data/realdata"
+  output_dir <- "../output/realdata_benchmark"
+  output_data_dir <- "../output/realdata_benchmark/data"
+  output_figure_dir <- "../output/realdata_benchmark/figures"
+  
+# set global parameters
+  pal0 = c("#ffb6db", "#33A02C", "#b66dff", "#FEC44F", "#41B6C4", "#8E0152", "#0868AC", "#807DBA", "#E7298A", "#810F7C", 
+           "#00441B", "#525252", "#4D9221", "#8B5742", "#D8DAEB", "#7cdd2d", "#980043", "#8C96C6", "#EC7014", "#92C5DE", 
+           "#FDAE61", "#1D91C0", "#A6DBA0", "#4292C6", "#BF812D", "#01665E", "#41AB5D", "#FE9929", "#252525", "#A6761D")
+           
+  names(pal0) = 1:30
+  
+  set.seed(1999)
+  
+  method = "ZINB-WaVE"
+  
+  BiocParallel::register(BiocParallel::SerialParam())
+```
+
+# Section-1 subset CD4 and CD8 T cells from the seurat object
+
+```{r}
+# load crc t-cell single-cell data
+# Please change it to your own path to the data  
+  real_data = readRDS("../data/realdata/1_CRC_final_annotation.rds")
+
+# subset the CD4 T cells
+  real_data_cd4 = subset(x = real_data, subset = (T_cell_type == "CD4"))
+  count_cd4 = as.matrix(real_data_cd4@assays$RNA@counts)
+  gene_cd4 = real_data_cd4@reductions$pca@cell.embeddings
+  gene_umap_cd4 = real_data_cd4@reductions$umap@cell.embeddings
+  condition_cd4 = real_data_cd4@meta.data$Onset
+  cell_names_cd4 = colnames(count_cd4)
+  celltype_cd4 = real_data_cd4@meta.data$annotation_final
+
+# subset the CD8 T cells
+  real_data_cd8 = subset(x = real_data, subset = (T_cell_type == "CD8"))
+  count_cd8 = as.matrix(real_data_cd8@assays$RNA@counts)
+  gene_cd8 = real_data_cd8@reductions$pca@cell.embeddings
+  gene_umap_cd8 = real_data_cd8@reductions$umap@cell.embeddings
+  condition_cd8 = real_data_cd8@meta.data$Onset
+  cell_names_cd8 = colnames(count_cd8)
+  celltype_cd8 = real_data_cd8@meta.data$annotation_final
+```
+
+# Section-2 run ZINB-WaVE on the CD4 and CD8 cells seperatly
+
+```{r eval=FALSE}
+# Note
+# This section presents the data directly for illustrative purposes to facilitate the replication of the results discussed in our manuscript.
+# Users can also execute the provided code below to verify and explore these results in their own environment.
+
+if (!file.exists(paste0(output_data_dir, "/CD4_", method, ".rds"))) {
+# prepare ZINB-WaVE Input
+  colData = DataFrame(Annotation=celltype_cd4, Condition=condition_cd4, row.names=colnames(count_cd4))
+  realdata_zinb = SummarizedExperiment(assays=list(counts=count_cd4), colData=colData)
+  filter = rowSums(assay(realdata_zinb)>5)>5
+  realdata_zinb = realdata_zinb[filter,]
+  assay(realdata_zinb) %>% log1p %>% rowVars -> vars # We next identify the 100 
+  names(vars) = rownames(realdata_zinb)
+  vars = sort(vars, decreasing = TRUE)
+  realdata_zinb = realdata_zinb[names(vars)[1:100],]
+  assayNames(realdata_zinb)[1] = "counts"
+# run ZINB-WaVE
+  zinb_out = zinbwave(realdata_zinb, K = 25, X="~Condition", epsilon=1000)
+  W_zinb = reducedDim(zinb_out)
+  zinb_out_seurat = as.Seurat(x = zinb_out, counts = "counts", data = "counts")
+  zinb_out_seurat = FindNeighbors(zinb_out_seurat, reduction = "zinbwave",
+                                   dims = 1:25 #this should match K
+  )
+  zinb_out_seurat = FindClusters(object = zinb_out_seurat)
+# save the object
+  saveRDS(zinb_out_seurat, paste0(output_data_dir, "/CD4_", method, ".rds"))
+}
+
+# run starts
+if (!file.exists(paste0(output_data_dir, "/CD8_", method, ".rds"))) {
+# prepare ZINB-WaVE Input
+  colData = DataFrame(Annotation=celltype_cd8, Condition=condition_cd8, row.names=colnames(count_cd8))
+  realdata_zinb = SummarizedExperiment(assays=list(counts=count_cd8), colData=colData)
+  filter = rowSums(assay(realdata_zinb)>5)>5
+  realdata_zinb = realdata_zinb[filter,]
+  assay(realdata_zinb) %>% log1p %>% rowVars -> vars # We next identify the 100 
+  names(vars) = rownames(realdata_zinb)
+  vars = sort(vars, decreasing = TRUE)
+  realdata_zinb = realdata_zinb[names(vars)[1:100],]
+  assayNames(realdata_zinb)[1] = "counts"
+# run ZINB-WaVE
+  zinb_out = zinbwave(realdata_zinb, K = 25, X="~Condition", epsilon=1000)
+  W_zinb = reducedDim(zinb_out)
+  zinb_out_seurat = as.Seurat(x = zinb_out, counts = "counts", data = "counts")
+  zinb_out_seurat = FindNeighbors(zinb_out_seurat, reduction = "zinbwave", 
+                                   dims = 1:25 #this should match K
+  )
+  zinb_out_seurat = FindClusters(object = zinb_out_seurat)
+# save the object
+  saveRDS(zinb_out_seurat, paste0(output_data_dir, "/CD8_", method, ".rds"))
+}
+
+```
+
+# Section-3 analysis the zinb-wave results of CD4 T cells
+
+```{r}
+# load the data
+  zinb_out_seurat_cd4 = readRDS(paste0(output_data_dir, "/CD4_ZINB-WaVE.rds"))
+
+# Cluster enrichment analysis
+  cluster = as.numeric(zinb_out_seurat_cd4$zinbwave_clusters)
+  cluster = factor(cluster, levels=as.character(1:max(cluster)))
+  
+  print("The clustering results for CD4 T cells:")
+  table(zinb_out_seurat_cd4$Onset, zinb_out_seurat_cd4$zinbwave_clusters)
+```
+
+```{r}
+# cluster weight, type
+  cluster_num = cluster_num_func(cluster, zinb_out_seurat_cd4$Condition)
+  cluster_type = cluster_type_func(cluster, cluster_num)
+  zinb_out_seurat_cd4$cluster_type = cluster_type
+  
+# plot the clustering results    
+  df = data.frame(UMAP1 = gene_umap_cd4[,1], 
+                   UMAP2 = gene_umap_cd4[,2], 
+                   Cluster = as.character(cluster))
+  df_naomit = na.omit(df)
+  p = ggplot(df_naomit, aes(x = UMAP1, y = UMAP2, color = Cluster)) +
+    geom_point(size = 0.5) +
+    scale_color_manual(values=c(pal0)) +
+    guides(colour=guide_legend(override.aes=list(size = 5))) +
+    ggtitle(paste0(method," - CD4 T cell clusters"))
+  print(p)
+```
+
+
+```{r}
+# Calcualte the CI weights
+  alpha_ci = 0.05; z = qnorm(alpha_ci/2) # set parameters
+  th_star = apply(cluster_num, 1, sum) # total number of cells from each condition
+  th_star = th_star/sum(th_star)       # proportion
+  th_star = th_star[1]                 # the total proportion of condition-A cells
+  cluster_total = apply(cluster_num, 2, sum) # total number of cells in each cluster
+  th_hat = t(t(cluster_num) / cluster_total)[1, ] # the proportion of condition-A cells in each cluster
+  ci_increa = z*sqrt(th_hat*(1-th_hat)/cluster_total) # calculate the variance
+  weight_ci = rbind(th_hat - ci_increa, th_hat + ci_increa) # weight with CI
+  weight_ci_cd4 = rbind(th_hat, weight_ci[c(2,1),])-th_star
+  Cind = which(weight_ci[1, ] >= th_star & weight_ci[2, ] <= th_star) # if it covers zero
+  Aind = which(weight_ci[2, ] > th_star) # if the lower band is larger than the observed
+  Bind = which(weight_ci[1, ] < th_star)
+  cluster_type = rep(NA, length(cluster))
+  cluster_type[which(cluster %in% Cind)] = "C"
+  cluster_type[which(cluster %in% Aind)] = "B"
+  cluster_type[which(cluster %in% Bind)] = "A"
+  cluster_type = factor(cluster_type, levels = c("C", "A", "B"))
+```
+
+# Section-4 analysis the zinb-wave results of CD8 T cells
+
+```{r}
+# load the data
+  zinb_out_seurat_cd8 = readRDS(paste0(output_data_dir, "/CD8_ZINB-WaVE.rds"))
+
+# Cluster enrichment analysis
+  cluster = as.numeric(zinb_out_seurat_cd8$zinbwave_clusters)
+  cluster = factor(cluster, levels=as.character(1:max(cluster)))
+  
+  print("The clustering results for CD8 T cells:")
+  table(zinb_out_seurat_cd8$Onset, zinb_out_seurat_cd8$zinbwave_clusters)
+```
+
+```{r}
+# cluster weight, type
+  cluster_num = cluster_num_func(cluster, zinb_out_seurat_cd8$Condition)
+  cluster_type = cluster_type_func(cluster, cluster_num)
+  zinb_out_seurat_cd8$cluster_type = cluster_type
+
+# plot the clustering results    
+  df = data.frame(UMAP1 = gene_umap_cd8[,1], 
+                   UMAP2 = gene_umap_cd8[,2], 
+                   Cluster = as.character(cluster))
+  df_naomit = na.omit(df)
+  p = ggplot(df_naomit, aes(x = UMAP1, y = UMAP2, color = Cluster)) +
+    geom_point(size = 0.5) +
+    scale_color_manual(values=c(pal)) +
+    guides(colour=guide_legend(override.aes=list(size = 5))) +
+    ggtitle(paste0(method," - CD8 T cell clusters"))
+  print(p)
+```
+
+```{r}
+  # cluster; cluster_num; 
+  z = qnorm(alpha_ci/2) #
+  th_star = apply(cluster_num, 1, sum) # total number of cells from each condition
+  th_star = th_star/sum(th_star)       # proportion
+  th_star = th_star[1]                 # the total proportion of condition-A cells
+  cluster_total = apply(cluster_num, 2, sum) # total number of cells in each cluster
+  th_hat = t(t(cluster_num) / cluster_total)[1, ] # the proportion of condition-A cells in each cluster
+  ci_increa = z*sqrt(th_hat*(1-th_hat)/cluster_total) # calculate the variance
+  weight_ci = rbind(th_hat - ci_increa, th_hat + ci_increa) # weight with CI
+  weight_ci_cd8 = rbind(th_hat, weight_ci[c(2,1),])-th_star
+  Cind = which(weight_ci[1, ] >= th_star & weight_ci[2, ] <= th_star) # if it covers zero
+  Aind = which(weight_ci[2, ] > th_star) # if the lower band is larger than the observed
+  Bind = which(weight_ci[1, ] < th_star)
+  cluster_type = rep(NA, length(cluster))
+  cluster_type[which(cluster %in% Cind)] = "C"
+  cluster_type[which(cluster %in% Aind)] = "B"
+  cluster_type[which(cluster %in% Bind)] = "A"
+  cluster_type = factor(cluster_type, levels = c("C", "A", "B"))
+```
+
+# Section-5 Visualization
+
+```{r}
+# Prepare the input
+  df_cd4 = data.frame(num_clus_cts = 
+                      c(table(zinb_out_seurat_cd4$cluster_type, zinb_out_seurat_cd4$Annotation)[1,],
+                        table(zinb_out_seurat_cd4$cluster_type, zinb_out_seurat_cd4$Annotation)[2,],
+                        table(zinb_out_seurat_cd4$cluster_type, zinb_out_seurat_cd4$Annotation)[3,]),
+                      enrich_res =  c(rep("C_",3),rep("E_",3),rep("L_",3)),
+                      cell = c( "cd4T_hp","cd4T_other","cd4T_rg", "cd4T_hp","cd4T_other","cd4T_rg","cd4T_hp","cd4T_other","cd4T_rg" ))
+
+  df_cd8 = data.frame(num_clus_cts = 
+                      c(table(zinb_out_seurat_cd8$cluster_type, zinb_out_seurat_cd8$Annotation)[1,],
+                        table(zinb_out_seurat_cd8$cluster_type, zinb_out_seurat_cd8$Annotation)[2,],
+                        table(zinb_out_seurat_cd8$cluster_type, zinb_out_seurat_cd8$Annotation)[3,]),
+                      enrich_res =  c(rep("C_",3), rep("E_",3),rep("L_",3)),
+                      cell = c("CD8T_em","CD8T_ex","CD8T_other","CD8T_em","CD8T_ex","CD8T_other","CD8T_em","CD8T_ex","CD8T_other"))
+  
+  df = rbind(df_cd4, df_cd8)
+  df$final = paste0(df$enrich_res,df$cell)
+  df$final = factor(df$final, levels = c(paste0(df$enrich_res,df$cell)))
+  
+# Plot the bar plot
+  pal0 = c("#ffb6db", "#33A02C", "#b66dff", "#FEC44F", "#41B6C4", "#8E0152")
+  p = 
+  ggplot(df, aes(x=final, y=num_clus_cts, fill=cell)) +
+    geom_bar(stat="identity") +
+    scale_fill_manual(values=pal0) +
+    ylab("Num of cells") + theme_classic() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  print(p)
+```
+
+
+```{r}
+# node_annot is the cluster annotations
+# cell_annot is the cell annotations (the ones corresponding to the cluster assigned to)
+  df_ci_visualization = data.frame(Cluster = c(paste0("CD4_",1:5),paste0("CD8_",1:4)),
+                                     weight = c(weight_ci_cd4[1,],weight_ci_cd8[1,]), 
+                                     ci_low = c(weight_ci_cd4[2,],weight_ci_cd8[2,]),
+                                     ci_high = c(weight_ci_cd4[3,],weight_ci_cd8[3,]),
+                                     Celltype = c(rep("CD4+", 5), rep("CD8+", 4)))
+  df_ci_visualization$Cluster
+  p =
+    ggplot(df_ci_visualization, aes(x=Cluster, y= weight)) +
+      geom_errorbar(width=0.8, aes(ymin=ci_low, ymax=ci_high, col = Celltype)) +
+      geom_point(aes(col = Celltype), size = 3) +
+      ylab("ZINB-WAVE binomial proportion confidence interval") +
+      ggtitle("BPCI-Cluster&Celltype")
+  print(p)
+```

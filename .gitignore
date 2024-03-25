@@ -14,3 +14,4 @@ data/simulation_sc3/pbmc3k_final.rds
 data/simulation_sc3/pbmc_copula.rds
 data/simulation_sc3/pbmc_tutorial.rds
 output/realdata/data/output888.rds
+output/realdata/data/SASC_output.rds
