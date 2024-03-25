@@ -17,7 +17,10 @@ comp_func.R contains contains other functions for simulation visualization and c
 
 #### Real data analysis
 
-SASC_CRC.Rmd reproduces real data analysis results. (Figure 1, 5, S7, and S8). See [here](code/SASC_CRC.pdf) for a pdf output of the .Rmd file as a tutorial.
+SASC_CRC.Rmd reproduces real data analysis results (Figure 1, 5, S7, and S8). See [here](code/SASC_CRC.pdf) for a pdf output of the .Rmd file as a tutorial. 
+
+SASC_CRC_DEanalysis.Rmd reproduces DE analysis post-processing for CRC data (Figure 6). See [here](code/SASC_CRC_DEanalysis.pdf) for a pdf output of the .Rmd file. 
+CRC_benchmark.Rmd reproduces analysis of CRC data using benchmark method (Figure S9).
 
 #### Simulation studies
 
