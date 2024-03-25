@@ -17,7 +17,6 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 
 ```{r}
 library(scry)
-library(glmpca)
 library(ggplot2); theme_set(theme_bw())
 library(umap)
 library(mvtnorm)
