@@ -8,7 +8,6 @@ output:
 ---
 ```{r message=FALSE}
 # load the pacakges
-  library(glmpca)
   library(ggplot2); theme_set(theme_bw())
   library(cluster)
   library(salso)
