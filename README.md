@@ -34,6 +34,8 @@ The data folder contains real data and data generated in simulation studies.
 
 simulate_data_sc1.Rmd reproduces the data generation process in simulation study scenario 1. See [here](data/simulate_data_sc1.pdf) for a pdf output of the .Rmd file as a tutorial. Codes are also provided for scenario 2 and 3 in simulate_data_sc2.Rmd and simulate_data_sc3.Rmd.
 
+preprocessing_CRC.Rmd reproduces the preprocessing process of real data analysis.
+
 ### output folder
 
 The output folder contains all output data, figures, and tables. 
