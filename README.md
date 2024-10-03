@@ -36,9 +36,13 @@ simulate_data_sc1.Rmd reproduces the data generation process in simulation study
 
 preprocessing_CRC.Rmd reproduces the preprocessing process of real data analysis.
 
+filtered_gene_bc_matrices folder contains the raw data we used for data generation of simulation data. It is publicly available at [pbmcdata](https://satijalab.org/seurat/articles/pbmc3k_tutorial.html). simulation_sc1, simulation_sc2, simulation_sc3 folder contains generated simulation data and figures, for scenario 1,2,3 in the simulation studies, respectively. realdata folder contains bothe raw and processed data for real data analysis. The raw data is available at [GEO site](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE108989) and supplementary tables in [Zhang et al. (2018)](https://www.nature.com/articles/s41586-018-0694-x).
+
 ### output folder
 
 The output folder contains all output data, figures, and tables. 
+
+realdata folder contains output data and figures for real data analysis with SASC. realdata_benchmark contains output data and figures for real data analysis with benchmark method. simulation_sc1(2,3) contains output data, figures, and tables for simulation study scenario 1(2,3).
 
 
 ## Supporting software
