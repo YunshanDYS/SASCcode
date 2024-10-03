@@ -46,11 +46,7 @@ output:
 ```{r}
 # load crc t-cell single-cell data
 # Please change it to your own path to the data  
-  if (file.exists(paste0(data_dir, "/CRC_final_annotation.rds"))){
-    real_data <- readRDS(paste0(data_dir, "/CRC_final_annotation.rds"))
-  } else {
-    cat("***Please first run ''preprocessing_CRC.Rmd'' for data preprocessing***")
-  }
+  real_data = readRDS("../data/realdata/1_CRC_final_annotation.rds")
 
 # subset the CD4 T cells
   real_data_cd4 = subset(x = real_data, subset = (T_cell_type == "CD4"))
@@ -157,7 +153,6 @@ if (!file.exists(paste0(output_data_dir, "/CD8_", method, ".rds"))) {
     scale_color_manual(values=c(pal0)) +
     guides(colour=guide_legend(override.aes=list(size = 5))) +
     ggtitle(paste0(method," - CD4 T cell clusters"))
-  ggsave(filename = paste0(output_figure_dir, "/zinbwave_CD4.pdf"), width = 4, height = 3.5)
   print(p)
 ```
 
@@ -213,7 +208,6 @@ if (!file.exists(paste0(output_data_dir, "/CD8_", method, ".rds"))) {
     scale_color_manual(values=c(pal)) +
     guides(colour=guide_legend(override.aes=list(size = 5))) +
     ggtitle(paste0(method," - CD8 T cell clusters"))
-  ggsave(filename = paste0(output_figure_dir, "/zinbwave_CD8.pdf"), width = 4, height = 3.5)
   print(p)
 ```
 
@@ -268,7 +262,6 @@ if (!file.exists(paste0(output_data_dir, "/CD8_", method, ".rds"))) {
     scale_fill_manual(values=pal0) +
     ylab("Num of cells") + theme_classic() +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-  ggsave(filename = paste0(output_figure_dir, "/zinbwave_typenum.pdf"), width = 7, height = 3.5)
   print(p)
 ```
 
@@ -288,6 +281,5 @@ if (!file.exists(paste0(output_data_dir, "/CD8_", method, ".rds"))) {
       geom_point(aes(col = Celltype), size = 3) +
       ylab("ZINB-WAVE binomial proportion confidence interval") +
       ggtitle("BPCI-Cluster&Celltype")
-  ggsave(filename = paste0(output_figure_dir, "/zinbwave_weights.pdf"), width = 6, height = 5)
   print(p)
 ```

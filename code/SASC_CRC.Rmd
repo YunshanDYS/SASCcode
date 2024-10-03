@@ -46,12 +46,7 @@ names(pal) <- 1:30
 ### Read data:
 
 ```{r}
-if (file.exists(paste0(data_dir, "/CRC_final_annotation.rds"))){
-  input <- readRDS(paste0(data_dir, "/CRC_final_annotation.rds"))
-} else {
-  cat("***Please first run ''preprocessing_CRC.Rmd'' for data preprocessing***")
-}
-
+input <- readRDS(paste0(data_dir, "/1_CRC_final_annotation.rds"))
 
 pdf(file = paste0(output_figure_dir, "/PCAelbow.pdf"), width = 5, height = 4)
 ElbowPlot(input, ndims = 50)

@@ -16,13 +16,8 @@ output:
   library(fdrtool)
   library(Seurat)
 # read the model output
-if (file.exists("../output/realdata/data/SASC_output.rds")) {
   output = readRDS(file = "../output/realdata/data/SASC_output.rds")
   clusterinfo = readRDS(file = "../output/realdata/data/clusterinfo.rds")
-} else {
-  cat("***Please first run ''SASC_CRC.Rmd'' for model-based inference.***")
-}
-  
 ```
 
 ```{r fig.width=12, fig.height=5}

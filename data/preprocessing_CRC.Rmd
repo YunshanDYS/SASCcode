@@ -1,0 +1,467 @@
+---
+title: "Preprocessing of CRC data"
+author: "Shuai Guo, Yunshan Duan"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+```{r fig.height=4, fig.width=5}
+library(Seurat)
+library(dplyr)
+library(ProjecTILs)
+library(ggplot2); theme_set(theme_bw())
+
+data_dir <- "./realdata"
+```
+
+### Read unpreprocessed raw counts txt file
+
+```{r fig.height=4, fig.width=5}
+library(Seurat)
+library(dplyr)
+library(ProjecTILs)
+library(ggplot2); theme_set(theme_bw())
+
+Raw.counts = read.table(paste0(data_dir, "/GSE108989_CRC.TCell.S11138.count.txt.gz"))
+Raw_counts_matrix = as.matrix(Raw.counts[2:nrow(Raw.counts),2:ncol(Raw.counts)])
+colnames(Raw_counts_matrix) = Raw.counts[1, 2:ncol(Raw.counts)]
+Raw_counts_matrix.1 = apply(Raw_counts_matrix[, 2:ncol(Raw_counts_matrix)], 2, as.numeric)
+symbol = Raw_counts_matrix[,1]
+Raw_counts_matrix_2018_nature = aggregate(Raw_counts_matrix.1, by = list(Gene = symbol), sum)
+row.names(Raw_counts_matrix_2018_nature) = Raw_counts_matrix_2018_nature[,'Gene']
+Raw_counts_matrix_2018_nature = Raw_counts_matrix_2018_nature[,-1]
+```
+
+
+### Preprocessed raw counts matrix ----> Unpreprocessed Seurat object
+
+
+```{r fig.height=4, fig.width=5}
+row.object = CreateSeuratObject(counts = Raw_counts_matrix_2018_nature, project = "2018_nat", min.cells = 3, min.features = 200)
+dim(row.object)
+# # Raw matrix: 11138 cells and 22753 genes
+
+FeatureScatter(row.object, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + 
+  geom_segment(aes(x = 2000000, xend = 2000000, y = 500,  yend = 7000), color="blue") +
+  geom_segment(aes(x = 500, xend = 2500000, y = 6500,  yend = 6500), color="blue") 
+plot(sort(row.object$nCount_RNA)) + abline(h = 2000000, col = "red") #+ abline(h = 500, col = "blue")
+plot(sort(row.object$nFeature_RNA)) + abline(h = 6500, col = "red")
+
+load(paste0(data_dir, "/Valid_cell_and_gene_id.RData"))
+metadata = read.csv(paste0(data_dir, "/2018_Nature_LeiZhang_Metadata.csv"))
+
+valid.gene = intersect(rownames(Raw_counts_matrix_2018_nature), valid.gene)
+valid.cell = intersect(colnames(Raw_counts_matrix_2018_nature),metadata$Cell.name)
+valid.matrix = Raw_counts_matrix_2018_nature[valid.gene, valid.cell]
+CRC_2018_nature <- CreateSeuratObject(counts = valid.matrix, project = "2018_nat", min.cells = 3, min.features = 200)
+CRC_2018_nature[["percent.mt"]] <- PercentageFeatureSet(CRC_2018_nature, pattern = "^MT-")
+# dim(CRC_2018_nature)
+# After filtering based on the quality: 9878 valid cell (1260 cells are filtered)
+
+CRC_2018_nature_qc <- subset(CRC_2018_nature,
+                             subset = nFeature_RNA > 500 & nFeature_RNA < 6500 &
+                                      nCount_RNA > 500 & nCount_RNA < 2000000)
+# dim(CRC_2018_nature_qc)
+# After filtering based on the quality: 9804 cell (74 cells are filtered)
+
+FeatureScatter(CRC_2018_nature_qc, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + 
+  geom_segment(aes(x = 2000000, xend = 2000000, y = 500,  yend = 7000), color="blue") +
+  geom_segment(aes(x = 500, xend = 2150000, y = 6500,  yend = 6500), color="blue") +
+  xlim(0, max(row.object$nCount_RNA)) +
+  ylim(0, max(row.object$nFeature_RNA))
+plot(sort(CRC_2018_nature_qc$nCount_RNA), ylim = c(0, max(row.object$nCount_RNA))) + abline(h = 2000000, col = "red")
+plot(sort(CRC_2018_nature_qc$nFeature_RNA), ylim = c(0, max(row.object$nFeature_RNA))) + abline(h = 6500, col = "red")
+
+```
+
+
+### Preprocessed raw counts ----> Seurat object preprocessed unannotated
+
+```{r fig.height=4, fig.width=5}
+metadata = metadata[-which(metadata$Cell.name == ""),]
+row.names(metadata) = metadata$Cell.name
+metadata.valid = metadata[colnames(CRC_2018_nature_qc),]
+CRC_2018_nature_qc@meta.data = cbind(CRC_2018_nature_qc@meta.data,metadata.valid)
+colnames(CRC_2018_nature_qc@meta.data) = c("orig.ident", "nCount_RNA", "nFeature_RNA", "percent.mt", 
+                                           "Patient",  "Cell_name", "T_cell_type", "T_cell_cluster",
+                                           "Clone_ID", "Clonality")
+  
+clinical = read.csv(paste0(data_dir, "/2018_Nature_LeiZhang_Clinical_info.csv"))
+clinical[,1] = c("Age", "Gender", "Histology", "pTNM_T", "pTNM_N", "pTNM_M", "Stage", "Differentiation_stage", "MSI_status")
+row.names(clinical) = c("Age", "Gender", "Histology", "pTNM_T", "pTNM_N", "pTNM_M", "Stage", "Differentiation_stage", "MSI_status")
+clinical_info = NULL
+for (j in clinical[,1]) {
+  temp = CRC_2018_nature_qc$Patient
+  for (i in colnames(clinical)[2:13]) {
+    temp[which(temp == i)] = clinical[j,i]
+  }
+  clinical_info = cbind(clinical_info, temp)
+}
+colnames(clinical_info) = c("Age", "Gender", "Histology", "pTNM_T", "pTNM_N", "pTNM_M", "Stage", "Differentiation_stage", "MSI_status")
+clinical_info = as.data.frame(clinical_info)
+clinical_info$Age = as.numeric(clinical_info$Age)
+
+clinical_info$Onset = clinical_info$Age
+clinical_info$Onset = "Intermediate"
+clinical_info$Onset[which(clinical_info$Age > 60)] = "LOCRC"
+clinical_info$Onset[which(clinical_info$Age <= 50)] = "YOCRC"
+CRC_2018_nature_qc@meta.data = cbind(CRC_2018_nature_qc@meta.data,clinical_info)
+
+Idents(CRC_2018_nature_qc) = CRC_2018_nature_qc$Patient
+# Three patients are filtered due to MSI: P0123, P0413, P0825, P0909
+# One patient is filtered due to age located between 50 and 60: P0309
+CRC_2018_nature_filter1 = subset(CRC_2018_nature_qc, idents = c("P0701", "P1012", "P1207", "P1212", "P1228", "P0215", "P0411"))
+
+# dim(CRC_2018_nature_filter1) 5341 cells
+Idents(CRC_2018_nature_filter1) = CRC_2018_nature_filter1$T_cell_type
+CRC_2018_nature_filter2 = subset(CRC_2018_nature_filter1, idents = c("CD4", "CD8"))
+
+# Add sampling site infomation
+sample.orig = substr(colnames(CRC_2018_nature_filter2), 1, 3)
+sample.orig[which(sample.orig == "P07")] = substr(colnames(CRC_2018_nature_filter2)[which(sample.orig == "P07")],start = 7,stop = 9)
+CRC_2018_nature_filter2$sample.orig = sample.orig
+
+orig.ct = CRC_2018_nature_filter2$sample.orig
+# PTC, CD8+ cytotoxic T cells from peripheral blood; 
+# TTC, CD8+ cytotoxic T cells from tumour tissue; 
+# NTC, CD8+ cytotoxic T cells from adjacent normal tissue; 
+# 
+# PTH, CD4+CD25- cells from peripheral blood;
+# TTH, CD4+CD25- cells from tumour tissue;
+# NTH, CD4+CD25- cells from adjacent normal tissue; 
+# 
+# PTR, CD4+CD25hi cells from peripheral blood;
+# TTR, CD4+CD25hi cells from tumour tissue;
+# NTR, CD4+CD25hi cells from adjacent normal tissue; 
+# 
+# PTY, CD4+CD25int cells from peripheral blood;
+# TTY, CD4+CD25int cells from tumour tissue;
+# NTY, CD4+CD25int cells from adjacent normal tissue;
+# 
+# PP7, CD4+ T cells from peripheral blood; 
+# TP7, CD4+ T cells from tumour tissue;
+# NP7, CD4+ T cells from adjacent normal tissue; 
+orig.ct[which(orig.ct == "PTC")] = "P_CD8"
+orig.ct[which(orig.ct == "NTC")] = "N_CD8"
+orig.ct[which(orig.ct == "TTC")] = "T_CD8"
+orig.ct[which(orig.ct == "PTH" | orig.ct == "PTR" | orig.ct == "PTY" | orig.ct == "PP7")] = "P_CD4"
+orig.ct[which(orig.ct == "NTH" | orig.ct == "NTR" | orig.ct == "NTY" | orig.ct == "NP7")] = "N_CD4"
+orig.ct[which(orig.ct == "TTH" | orig.ct == "TTR" | orig.ct == "TTY" | orig.ct == "TP7")] = "T_CD4"
+CRC_2018_nature_filter2$orig.ct = orig.ct
+
+# dim(CRC_2018_nature_filter2) 4437 cells
+```
+
+### Standard Seurat preprocessing
+
+```{r fig.height=4, fig.width=5}
+CRC_2018_nature_filter2 <- NormalizeData(object = CRC_2018_nature_filter2, normalization.method = "LogNormalize", scale.factor = 10000)
+CRC_2018_nature_filter2 <- FindVariableFeatures(object = CRC_2018_nature_filter2, selection.method = "vst", nfeatures = 2000)
+all.genes = rownames(CRC_2018_nature_filter2)
+CRC_2018_nature_filter2 <- ScaleData(object = CRC_2018_nature_filter2, features = all.genes)
+# Run PCA
+CRC_2018_nature_filter2 <- RunPCA(object = CRC_2018_nature_filter2) 
+# ! Choose the num of dim after dim reduction
+ElbowPlot(CRC_2018_nature_filter2)
+
+CRC_2018_nature_filter2 <- RunPCA(object = CRC_2018_nature_filter2, npcs = 20) 
+CRC_2018_nature_filter2 <- FindNeighbors(object = CRC_2018_nature_filter2, dim = 1:20)
+CRC_2018_nature_filter2 <- FindClusters(object = CRC_2018_nature_filter2, resolution = 0.75)
+CRC_2018_nature_filter2 <- RunUMAP(object = CRC_2018_nature_filter2, dim = 1:20, return.model = T)
+CRC_2018_nature_filter2@reductions$pca
+# ProjecTILs annotation
+if (!file.exists("./ref_TILAtlas_mouse_v1.rds")){
+  options(timeout = max(1000, getOption("timeout"))) # increase timeout if download failed
+  ref <- load.reference.map()
+}
+CRC_2018_nature_ProjecTILs <- Run.ProjecTILs(CRC_2018_nature_filter2, ref = ref, filter.cells = FALSE)
+
+# image and data of mapping results
+DimPlot(CRC_2018_nature_ProjecTILs, group.by = "orig.ct", label = T)
+DimPlot(CRC_2018_nature_ProjecTILs, group.by = "functional.cluster", label = T)
+DimPlot(CRC_2018_nature_ProjecTILs, group.by = "Onset")
+
+CRC_2018_nature_filter2$functional.cluster = CRC_2018_nature_ProjecTILs$functional.cluster 
+
+DimPlot(CRC_2018_nature_filter2, group.by = "orig.ct", label = T)
+DimPlot(CRC_2018_nature_filter2, group.by = "functional.cluster", label = T)
+DimPlot(CRC_2018_nature_filter2, group.by = "Onset")
+
+CRC_2018_nature_p = subset(CRC_2018_nature_filter2, subset = orig.ct == "P_CD4" | orig.ct == "P_CD8")
+# dim(CRC_2018_nature_p) # 22753 1298
+CRC_2018_nature_nt = subset(CRC_2018_nature_filter2, subset = orig.ct == "N_CD4" | orig.ct == "N_CD8" |
+                                                              orig.ct == "T_CD4" | orig.ct == "T_CD8")
+# remove reference data after using
+if (file.exists("./ref_TILAtlas_mouse_v1.rds")){
+   file.remove("./ref_TILAtlas_mouse_v1.rds")
+}
+```
+
+### Annotation preprocessing
+
+```{r fig.height=4, fig.width=5}
+CRC_2018_nature_nt <- NormalizeData(object = CRC_2018_nature_nt, normalization.method = "LogNormalize", scale.factor = 10000)
+CRC_2018_nature_nt <- FindVariableFeatures(object = CRC_2018_nature_nt, selection.method = "vst", nfeatures = 2000)
+all.genes = rownames(CRC_2018_nature_nt)
+CRC_2018_nature_nt <- ScaleData(object = CRC_2018_nature_nt, features = all.genes)
+CRC_2018_nature_nt <- RunPCA(object = CRC_2018_nature_nt, npcs = 20) # dim 
+CRC_2018_nature_nt <- FindNeighbors(object = CRC_2018_nature_nt, dim = 1:20)
+CRC_2018_nature_nt <- FindClusters(object = CRC_2018_nature_nt, resolution = 0.75)
+CRC_2018_nature_nt <- RunUMAP(object = CRC_2018_nature_nt, dim = 1:20, return.model = T)
+
+annotation = CRC_2018_nature_nt$functional.cluster
+
+level3 = annotation
+level3[which(level3 == "Treg")] = "CD4_T_regulatory"
+level3[which(level3 == "Th1" | level3 == "Tfh")] = "CD4_T_helper"
+level3[which(level3 == "CD4_NaiveLike")] = "CD4_T_other"
+level3[which(level3 == "CD8_EffectorMemory")] = "CD8_T_effector_memory"
+level3[which(level3 == "CD8_Tex" | level3 == "CD8_Tpex" | level3 == "CD8_NaiveLike" | level3 == "CD8_EarlyActiv" )] = "CD8_T_other"
+
+level4 = annotation
+level4[which(level4 == "CD4_NaiveLike")] = "CD4_T_other"
+level4[which(level4 == "Th1" | level4 == "Tfh")] = "CD4_T_helper"
+level4[which(level4 == "Treg")] = "CD4_T_regulatory"
+level4[which(level4 == "CD8_NaiveLike" | level4 == "CD8_EarlyActiv" )] = "CD8_T_early"
+level4[which(level4 == "CD8_EffectorMemory")] = "CD8_T_effector_memory"
+level4[which(level4 == "CD8_Tex" | level4 == "CD8_Tpex")] = "CD8_T_terminal"
+
+CRC_2018_nature_nt$level3 = level3
+CRC_2018_nature_nt$level4 = level4
+
+DimPlot(CRC_2018_nature_nt, group.by = "orig.ct", label = T)
+DimPlot(CRC_2018_nature_nt, group.by = "Onset")
+DimPlot(CRC_2018_nature_nt, group.by = "level3", label = T)
+DimPlot(CRC_2018_nature_nt, group.by = "level4", label = T)
+
+```
+
+
+### Annotation
+
+```{r fig.height=4, fig.width=5}
+# Packages
+  library(Seurat)
+  library(dplyr)
+  library(ggalluvial)
+  crc_tcell = CRC_2018_nature_nt
+  Idents(crc_tcell) = crc_tcell$T_cell_type
+  
+  DimPlot(crc_tcell)
+  
+  crc_cd4 = subset(crc_tcell, idents = "CD4")
+  crc_cd8 = subset(crc_tcell, idents = "CD8")
+```
+
+#--------------------------
+# Annotation of CD8 T cells
+#--------------------------
+
+```{r fig.height=4, fig.width=6}
+  seuratObj_sub = crc_cd8
+  seuratObj_sub <- NormalizeData(seuratObj_sub)
+  seuratObj_sub <- FindVariableFeatures(seuratObj_sub, selection.method = "vst", nfeatures = 2000)
+  all.genes <- rownames(seuratObj_sub)
+  seuratObj_sub <- ScaleData(seuratObj_sub, features = all.genes)
+  seuratObj_sub <- RunPCA(seuratObj_sub, features = VariableFeatures(object = seuratObj_sub))
+  seuratObj_sub <- RunUMAP(seuratObj_sub, dims = 1:25)
+  seuratObj_sub <- FindNeighbors(object = seuratObj_sub, dims = 1:25)
+  seuratObj_sub <- FindClusters(seuratObj_sub, resolution = 0.75)
+  Idents(seuratObj_sub) = seuratObj_sub$seurat_clusters
+  crc_cd8 = seuratObj_sub
+  
+  DimPlot(crc_cd8, label = T)
+  
+  DimPlot(crc_cd8, group.by = "T_cell_cluster", label = F)
+  
+```
+
+```{r fig.height=3.5, fig.width=6}
+  Idents(crc_cd8) =  factor(as.numeric(crc_cd8$seurat_clusters)-1,
+                            levels = c(1,4,7,     # other t cells
+                                       0,2,6,     # t em cells
+                                       3,5,8,9))  # t ex cells
+  T_em_posi = c("GZMK","CCR7","TCF7","SELL","CX3CR1")
+  T_ex_posi = c("PDCD1","CTLA4","LAG3","TIGIT", "HAVCR2", "TOX")
+  
+  DotPlot(object = crc_cd8, features = c(T_em_posi, T_ex_posi)) + 
+          theme(axis.text.x = element_text(angle = 45, vjust = 0.55, hjust = 0.55))
+  
+```
+
+```{r fig.height=6, fig.width=6}
+  # Marker of CD8
+  FeaturePlot(crc_cd8, features = T_em_posi)
+  FeaturePlot(crc_cd8, features = T_ex_posi)
+```
+
+```{r fig.height=4, fig.width=11}
+  markers_cd8 = FindAllMarkers(crc_cd8, only.pos = T)
+  marker.sortedByPvaladj = markers_cd8[order(markers_cd8$p_val_adj),]
+  filtered_markers_merged_screening <- marker.sortedByPvaladj %>%
+                                       group_by(cluster) %>%
+                                       filter(p_val_adj < 0.05) %>%
+                                       filter(avg_log2FC > 0.1)
+  filtered_markers_merged_screening %>% group_by(cluster) %>% slice_max(n = 4, order_by = avg_log2FC) -> top2
+  top2$cluster = factor(top2$cluster,
+                        levels = c(1,4,7,     # other t cells
+                                   0,2,6,     # t em cells
+                                   3,5,8,9))  # t ex cells
+  top2_sort = top2 %>% as.data.frame() %>% arrange(desc(cluster))
+  
+  DotPlot(object = crc_cd8, features = rev(unique(top2_sort$gene))) + 
+          theme(axis.text.x = element_text(angle = 45, vjust = 0.55, hjust = 0.55))
+```
+
+```{r fig.height=4, fig.width=5}
+crc_cd8$annotation_final = as.numeric(crc_cd8$seurat_clusters)
+crc_cd8$annotation_final[which(crc_cd8$seurat_clusters == 3 | crc_cd8$seurat_clusters == 5 |
+                               crc_cd8$seurat_clusters == 8 | crc_cd8$seurat_clusters == 9)] = "CD8T_ex"
+crc_cd8$annotation_final[which(crc_cd8$seurat_clusters == 0 | crc_cd8$seurat_clusters == 2 | crc_cd8$seurat_clusters == 6)] = "CD8T_em"
+crc_cd8$annotation_final[which(crc_cd8$seurat_clusters == 1 | crc_cd8$seurat_clusters == 4 | crc_cd8$seurat_clusters == 7)] = "CD8T_other"
+DimPlot(crc_cd8, group.by = "annotation_final")
+```
+
+```{r fig.height=2.5, fig.width=6}
+  Idents(crc_cd8) = crc_cd8$annotation_final
+  markers_cd8 = FindAllMarkers(crc_cd8, only.pos = T)
+  marker.sortedByPvaladj = markers_cd8[order(markers_cd8$p_val_adj),]
+  filtered_markers_merged_screening <- marker.sortedByPvaladj %>%
+                                       group_by(cluster) %>%
+                                       filter(p_val_adj < 0.05) %>%
+                                       filter(avg_log2FC > 0.1)
+  filtered_markers_merged_screening %>% group_by(cluster) %>% slice_max(n = 4, order_by = avg_log2FC) -> top2
+  top2$cluster = factor(top2$cluster, levels = c("CD8T_other", "CD8T_em", "CD8T_ex"))
+  top2_sort = top2 %>% as.data.frame() %>% arrange(desc(cluster))
+  Idents(crc_cd8) =  factor(crc_cd8$annotation_final,
+                            levels = c("CD8T_other", "CD8T_em", "CD8T_ex"))
+  
+  DotPlot(object = crc_cd8, features = rev(unique(top2_sort$gene))) + 
+          theme(axis.text.x = element_text(angle = 45, vjust = 0.55, hjust = 0.55))
+```
+
+#--------------------------
+# Annotation of CD4 T cells
+#--------------------------
+
+```{r fig.height=4, fig.width=6}
+  seuratObj_sub = crc_cd4
+  seuratObj_sub <- NormalizeData(seuratObj_sub)
+  seuratObj_sub <- FindVariableFeatures(seuratObj_sub, selection.method = "vst", nfeatures = 2000)
+  all.genes <- rownames(seuratObj_sub)
+  seuratObj_sub <- ScaleData(seuratObj_sub, features = all.genes)
+  seuratObj_sub <- RunPCA(seuratObj_sub, features = VariableFeatures(object = seuratObj_sub))
+  seuratObj_sub <- RunUMAP(seuratObj_sub, dims = 1:25)
+  seuratObj_sub <- FindNeighbors(object = seuratObj_sub, dims = 1:25)
+  seuratObj_sub <- FindClusters(seuratObj_sub, resolution = 0.75)
+  Idents(seuratObj_sub) = seuratObj_sub$seurat_clusters
+  crc_cd4 = seuratObj_sub
+  
+  DimPlot(crc_cd4, label = T)
+  
+  DimPlot(crc_cd4, group.by = "T_cell_cluster", label = F)
+  
+```
+
+```{r fig.height=3.5, fig.width=6}
+  Idents(crc_cd4) =  factor(as.numeric(crc_cd4$seurat_clusters)-1,
+                            levels = c(6,7,   # t_other
+                                       0,2,9,   # t_reg
+                                       1,4,3,8,5))# t_h
+  T_rg_posi = c("FOXP3","CTLA4","IL2RA")
+  T_hp_posi = c("CXCR5","SLAMF6","TOX", # T_fh
+                "IFNGR1","FASLG",       # T_h1
+                "STAT6")      # T_h2
+
+  
+  DotPlot(object = crc_cd4, features = c(T_rg_posi, T_hp_posi)) + 
+          theme(axis.text.x = element_text(angle = 45, vjust = 0.55, hjust = 0.55))
+  
+```
+
+```{r fig.height=6, fig.width=6}
+  FeaturePlot(crc_cd4, features = T_rg_posi)  
+  FeaturePlot(crc_cd4, features = T_hp_posi)
+```
+
+```{r fig.height=4, fig.width=11}
+  markers_cd4 = FindAllMarkers(crc_cd4, only.pos = T)
+  marker.sortedByPvaladj = markers_cd4[order(markers_cd4$p_val_adj),]
+  filtered_markers_merged_screening <- marker.sortedByPvaladj %>%
+                                       group_by(cluster) %>%
+                                       filter(p_val_adj < 0.05) %>%
+                                       filter(avg_log2FC > 0.1)
+  filtered_markers_merged_screening %>% group_by(cluster) %>% slice_max(n = 4, order_by = avg_log2FC) -> top2
+  top2$cluster = factor(top2$cluster,
+                        levels = c(6,7,   # t_other
+                                   0,2,9,   # t_reg
+                                   1,4,3,8,5))# t_h
+  top2_sort = top2 %>% as.data.frame() %>% arrange(desc(cluster))
+  
+  DotPlot(object = crc_cd4, features = rev(unique(top2_sort$gene))) + 
+          theme(axis.text.x = element_text(angle = 45, vjust = 0.55, hjust = 0.55))
+  
+```
+
+```{r fig.height=4, fig.width=5}
+crc_cd4$annotation_final = as.numeric(crc_cd4$seurat_clusters)
+crc_cd4$annotation_final[which(crc_cd4$seurat_clusters == 0 | crc_cd4$seurat_clusters == 2 | crc_cd4$seurat_clusters == 9)] = "cd4T_rg"
+crc_cd4$annotation_final[which(crc_cd4$seurat_clusters == 1 | crc_cd4$seurat_clusters == 4 | crc_cd4$seurat_clusters == 3 | 
+                               crc_cd4$seurat_clusters == 8 | crc_cd4$seurat_clusters == 5)] = "cd4T_hp"
+crc_cd4$annotation_final[which(crc_cd4$seurat_clusters == 6 | crc_cd4$seurat_clusters == 7)] = "cd4T_other"
+
+DimPlot(crc_cd4, group.by = "annotation_final")
+
+```
+
+```{r fig.height=2.5, fig.width=6}
+  Idents(crc_cd4) = crc_cd4$annotation_final
+  markers_cd4 = FindAllMarkers(crc_cd4, only.pos = T)
+  marker.sortedByPvaladj = markers_cd4[order(markers_cd4$p_val_adj),]
+  filtered_markers_merged_screening <- marker.sortedByPvaladj %>%
+                                       group_by(cluster) %>%
+                                       filter(p_val_adj < 0.05) %>%
+                                       filter(avg_log2FC > 0.1)
+  filtered_markers_merged_screening %>% group_by(cluster) %>% slice_max(n = 4, order_by = avg_log2FC) -> top2
+  top2$cluster = factor(top2$cluster, levels = c("cd4T_other", "cd4T_rg", "cd4T_hp"))
+  top2_sort = top2 %>% as.data.frame() %>% arrange(desc(cluster))
+  Idents(crc_cd4) =  factor(crc_cd4$annotation_final,
+                            levels = c("cd4T_other", "cd4T_rg", "cd4T_hp"))
+  
+  DotPlot(object = crc_cd4, features = rev(unique(top2_sort$gene))) + 
+          theme(axis.text.x = element_text(angle = 45, vjust = 0.55, hjust = 0.55))
+     
+```
+
+#----------------------------
+# annotation merge
+#----------------------------
+
+```{r fig.height=4, fig.width=5}
+  annotation_final = c(crc_cd4$annotation_final, crc_cd8$annotation_final)
+  crc_tcell$annotation_final = annotation_final[colnames(crc_tcell)]
+  
+  seuratObj_sub = crc_tcell
+  seuratObj_sub <- NormalizeData(seuratObj_sub)
+  seuratObj_sub <- FindVariableFeatures(seuratObj_sub, selection.method = "vst", nfeatures = 2000)
+  all.genes <- rownames(seuratObj_sub)
+  seuratObj_sub <- ScaleData(seuratObj_sub, features = all.genes)
+  seuratObj_sub <- RunPCA(seuratObj_sub, features = VariableFeatures(object = seuratObj_sub))
+  seuratObj_sub <- RunUMAP(seuratObj_sub, dims = 1:25)
+  seuratObj_sub <- FindNeighbors(object = seuratObj_sub, dims = 1:25)
+  seuratObj_sub <- FindClusters(seuratObj_sub, resolution = 0.75)
+  Idents(seuratObj_sub) = seuratObj_sub$seurat_clusters
+  
+  DimPlot(seuratObj_sub, label = T, group.by = "annotation_final")
+  
+  CRC_final_annotation <- seuratObj_sub
+  saveRDS(CRC_final_annotation, file = "./realdata/1_CRC_final_annotation.rds")
+```
+
