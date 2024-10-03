@@ -39,7 +39,14 @@ simulate_data_sc1.Rmd reproduces the data generation process in simulation study
 The output folder contains all output data, figures, and tables. 
 
 
+## Supporting software
 
+The codes run under R v4.1.1. The following R packages are loaded:
+ggplot2 3.4.3, Seurat 4.4.0, fdrtool 1.2.17, salso 0.3.0, cluster 2.4.1, dplyr 1.1.3, ggpubr 0.6.0, scry 1.6.0, umap 0.2.10.0, mvtnorm 1.1-3, MCMCpack 1.6-3, zinbwave 1.16.0, SummarizedExperiment 1.24.0
+
+Using a later version of the R packages can still reproduce the results with ignorable quantitive change, expect for Seurat v4. Using Seurat v5 may require some syntax change in the code.
+
+Note that scry package is available on Bioconductor. Please follow the [instructions](https://bioconductor.org/packages/release/bioc/html/scry.html) to install it.
 
 
 
